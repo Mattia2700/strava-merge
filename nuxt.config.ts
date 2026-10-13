@@ -17,7 +17,7 @@ export default defineNuxtConfig({
   },
   vite: {
     optimizeDeps: {
-      include: ['@garmin/fitsdk'],
+      include: ['@garmin/fitsdk', 'leaflet'],
     },
   },
 })

@@ -11,11 +11,13 @@
   },
   "dependencies": {
     "@garmin/fitsdk": "^21.218.0",
+    "leaflet": "^1.9.4",
     "nuxt": "^4.6.1",
     "vue": "^3.5.43",
     "vue-router": "^5.4.0"
   },
   "devDependencies": {
+    "@types/leaflet": "^1.9.22",
     "linkedom": "^0.18.13",
     "tsx": "^4.23.15"
   }
