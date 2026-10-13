@@ -1,0 +1,22 @@
+{
+  "name": "strava-merge",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "@garmin/fitsdk": "^21.218.0",
+    "nuxt": "^4.6.1",
+    "vue": "^3.5.43",
+    "vue-router": "^5.4.0"
+  },
+  "devDependencies": {
+    "linkedom": "^0.18.13",
+    "tsx": "^4.23.15"
+  }
+}
