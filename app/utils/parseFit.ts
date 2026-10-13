@@ -1,13 +1,15 @@
 import type { ActivityStream, TrackPoint } from './activity'
 
+/** FIT timestamps are seconds since 1989-12-31, not Unix. */
+const FIT_EPOCH_MS = 631_065_600_000
+
 function toMs(value: unknown): number | undefined {
   if (value instanceof Date) return value.getTime()
   if (typeof value === 'number' && Number.isFinite(value)) {
-    // FIT epoch seconds (~after 1989) vs already-ms
+    // Already Unix milliseconds
     if (value > 1e12) return value
-    if (value > 1e9) return value * 1000 // unix seconds
-    // seconds since FIT epoch (1989-12-31)
-    return (value + 631065600) * 1000
+    // Decoder number = FIT datetime (seconds since FIT epoch)
+    return value * 1000 + FIT_EPOCH_MS
   }
   if (typeof value === 'string') {
     const t = Date.parse(value)
@@ -45,7 +47,8 @@ export async function parseFitBuffer(
     expandSubFields: false,
     expandComponents: false,
     convertTypesToStrings: true,
-    convertDateTimesToDates: false,
+    // Prefer Date objects so we never confuse FIT-epoch seconds with Unix time.
+    convertDateTimesToDates: true,
     mergeHeartRates: false,
     includeUnknownData: false,
   })
