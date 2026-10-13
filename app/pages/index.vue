@@ -252,7 +252,16 @@ async function uploadToStrava() {
 <template>
   <main class="page">
     <section class="hero">
-      <p class="brand">Strava Merge</p>
+      <div class="brand">
+        <img
+          class="brand-logo"
+          src="/logo.png"
+          alt=""
+          width="56"
+          height="56"
+        />
+        <p class="brand-name">Strava Merge</p>
+      </div>
       <h1>Phone base. Watch extras. Clean export.</h1>
       <p class="lede">
         Merge a phone recording with a watch recording, score overlapping metrics,
@@ -398,6 +407,19 @@ async function uploadToStrava() {
 }
 
 .brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.brand-logo {
+  width: clamp(2.5rem, 7vw, 3.5rem);
+  height: auto;
+  border-radius: 18%;
+  flex-shrink: 0;
+}
+
+.brand-name {
   margin: 0;
   font-family: var(--font-display);
   font-size: clamp(2rem, 6vw, 3.4rem);
