@@ -1,0 +1,40 @@
+# NAS / homelab draft (Synology, Unraid, CasaOS, Portainer, …)
+#
+# Local build on the NAS:
+#   docker compose up -d --build
+#
+# Or pull a published image (after GitHub Actions runs):
+#   1. Set image below to ghcr.io/<user-or-org>/strava-merge:latest
+#   2. If the package is private: docker login ghcr.io
+#   3. docker compose up -d
+
+services:
+  strava-merge:
+    build: .
+    # Swap to the GHCR image once published, e.g.:
+    # image: ghcr.io/your-user/strava-merge:latest
+    image: strava-merge:local
+    container_name: strava-merge
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+      NITRO_HOST: 0.0.0.0
+      NITRO_PORT: 3000
+      # Behind a reverse proxy on a subpath:
+      # NUXT_APP_BASE_URL: /strava-merge/
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    # networks:
+    #   - proxy
+
+# networks:
+#   proxy:
+#     external: true

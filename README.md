@@ -26,5 +26,31 @@ Open `http://localhost:3000`.
 
 Sample files in `samples/` / `public/samples/`:
 
-- `Miglia_Spezzate.gpx` — phone (GPS + cadence)
-- `Corsa_serale.gpx` — watch (GPS + heart rate)
+- `Miglia_Spezzate` — phone (GPS + cadence)
+- `Corsa_serale` — watch (GPS + heart rate)
+
+## Docker / NAS
+
+Build and run locally or on a NAS:
+
+```bash
+docker compose up -d --build
+```
+
+App listens on `http://<host>:3000`.
+
+### GitHub Container Registry
+
+Pushing to `main`/`master` (or a `v*` tag) runs [.github/workflows/docker-publish.yml](.github/workflows/docker-publish.yml) and publishes:
+
+`ghcr.io/<user-or-org>/strava-merge:latest`
+
+Multi-arch: `linux/amd64` + `linux/arm64` (typical x86 NAS and ARM Synology).
+
+On the NAS, set in `docker-compose.yml`:
+
+```yaml
+image: ghcr.io/<user-or-org>/strava-merge:latest
+```
+
+and either make the GHCR package public, or `docker login ghcr.io` with a PAT that can read packages.
