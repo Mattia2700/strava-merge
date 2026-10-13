@@ -1,5 +1,6 @@
 import type { H3Event } from 'h3'
 import { createError, deleteCookie, getCookie, getRequestURL, setCookie } from 'h3'
+import { sanitizeMessage } from '../../shared/sanitizeMessage'
 
 export const STRAVA_SCOPES = 'read,activity:write'
 
@@ -187,7 +188,9 @@ async function pollUpload(accessToken: string, uploadId: number): Promise<Strava
     if (status.error) {
       throw createError({
         statusCode: 422,
-        statusMessage: status.error || status.status || 'Strava upload failed',
+        statusMessage: sanitizeMessage(
+          status.error || status.status || 'Strava upload failed',
+        ),
       })
     }
 

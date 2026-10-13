@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { watch as watchVue } from 'vue'
 import type { ActivityStream, MergeChoices } from '~/utils/activity'
 import {
   durationMs,
@@ -15,6 +16,7 @@ import { parseActivityFile } from '~/utils/parseFile'
 import { downloadGpx } from '~/utils/exportGpx'
 import { downloadFit, exportFit } from '~/utils/exportFit'
 import { channelPresent } from '~/utils/activity'
+import { sanitizeMessage } from '~~/shared/sanitizeMessage'
 
 type StravaStatus = {
   configured: boolean
@@ -45,7 +47,15 @@ const busyLabel = ref('')
 const stravaMessage = ref('')
 const stravaUploading = ref(false)
 const stravaActivityUrl = ref('')
+const statusEl = ref<HTMLElement | null>(null)
 let mergeToken = 0
+
+// `watch` ref (device stream) shadows Vue's watch — use an alias
+watchVue([error, stravaMessage, busy], async ([err, msg, isBusy]) => {
+  if (!err && !msg && !isBusy) return
+  await nextTick()
+  statusEl.value?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+})
 
 const { data: strava, refresh: refreshStrava } = await useFetch<StravaStatus>(
   '/api/strava/status',
@@ -230,7 +240,7 @@ async function uploadToStrava() {
         ?.data?.statusMessage ||
       (e as { statusMessage?: string }).statusMessage ||
       (e instanceof Error ? e.message : 'Strava upload failed')
-    error.value = msg
+    error.value = sanitizeMessage(msg)
   } finally {
     stravaUploading.value = false
     busy.value = false
@@ -279,10 +289,6 @@ async function uploadToStrava() {
         @file="loadSide('watch', $event)"
       />
     </section>
-
-    <p v-if="error" class="error">{{ error }}</p>
-    <p v-if="stravaMessage && !error" class="ok">{{ stravaMessage }}</p>
-    <p v-if="busy" class="busy">{{ busyLabel || 'Working…' }}</p>
 
     <section v-if="phoneSummary || watchSummary" class="summaries">
       <article v-if="phoneSummary">
@@ -362,6 +368,17 @@ async function uploadToStrava() {
       </div>
       <TrackPreview :points="merged.points" />
     </section>
+
+    <div
+      v-if="error || (stravaMessage && !error) || busy"
+      ref="statusEl"
+      class="status"
+      aria-live="polite"
+    >
+      <p v-if="error" class="error">{{ sanitizeMessage(error) }}</p>
+      <p v-else-if="stravaMessage" class="ok">{{ sanitizeMessage(stravaMessage) }}</p>
+      <p v-if="busy" class="busy">{{ busyLabel || 'Working…' }}</p>
+    </div>
   </main>
 </template>
 
@@ -526,6 +543,15 @@ button.linkish {
 
 .strava-meta a {
   color: var(--accent);
+}
+
+.status {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--card);
 }
 
 .error {

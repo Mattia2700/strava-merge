@@ -24,6 +24,10 @@ function setSource(channel: keyof MergeChoices, value: SourceChoice) {
 function setStrip(value: boolean) {
   emit('update:choices', { ...props.choices, stripTeleports: value })
 }
+
+function formatScore(n: number): string {
+  return n.toFixed(1)
+}
 </script>
 
 <template>
@@ -38,9 +42,9 @@ function setStrip(value: boolean) {
         <div>
           <h3>{{ METRIC_LABELS[d.channel] }}</h3>
           <p class="reason">
-            Phone {{ d.phoneScore }} — {{ d.phoneReason }}
+            Phone {{ formatScore(d.phoneScore) }} — {{ d.phoneReason }}
             <br>
-            Watch {{ d.watchScore }} — {{ d.watchReason }}
+            Watch {{ formatScore(d.watchScore) }} — {{ d.watchReason }}
           </p>
           <span class="rec">Suggested: {{ d.recommended }}</span>
         </div>
@@ -50,14 +54,14 @@ function setStrip(value: boolean) {
             :class="{ active: choices[d.channel as keyof MergeChoices] === 'phone' }"
             @click="setSource(d.channel as keyof MergeChoices, 'phone')"
           >
-            Phone {{ d.phoneScore }}
+            Phone {{ formatScore(d.phoneScore) }}
           </button>
           <button
             type="button"
             :class="{ active: choices[d.channel as keyof MergeChoices] === 'watch' }"
             @click="setSource(d.channel as keyof MergeChoices, 'watch')"
           >
-            Watch {{ d.watchScore }}
+            Watch {{ formatScore(d.watchScore) }}
           </button>
         </div>
       </article>
@@ -69,7 +73,7 @@ function setStrip(value: boolean) {
         <li v-for="d in exclusive" :key="d.channel">
           <strong>{{ METRIC_LABELS[d.channel] }}</strong>
           from {{ d.phonePresent ? 'phone' : 'watch' }}
-          (score {{ d.phonePresent ? d.phoneScore : d.watchScore }})
+          (score {{ formatScore(d.phonePresent ? d.phoneScore : d.watchScore) }})
         </li>
       </ul>
     </div>
