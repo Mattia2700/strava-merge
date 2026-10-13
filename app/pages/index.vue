@@ -13,8 +13,14 @@ import {
 } from '~/utils/merge'
 import { parseActivityFile } from '~/utils/parseFile'
 import { downloadGpx } from '~/utils/exportGpx'
-import { downloadFit } from '~/utils/exportFit'
+import { downloadFit, exportFit } from '~/utils/exportFit'
 import { channelPresent } from '~/utils/activity'
+
+type StravaStatus = {
+  configured: boolean
+  connected: boolean
+  athlete: string | null
+}
 
 useHead({
   title: 'Strava Merge',
@@ -36,7 +42,38 @@ const merged = ref<ActivityStream | null>(null)
 const error = ref('')
 const busy = ref(false)
 const busyLabel = ref('')
+const stravaMessage = ref('')
+const stravaUploading = ref(false)
+const stravaActivityUrl = ref('')
 let mergeToken = 0
+
+const { data: strava, refresh: refreshStrava } = await useFetch<StravaStatus>(
+  '/api/strava/status',
+  { default: () => ({ configured: false, connected: false, athlete: null }) },
+)
+
+const route = useRoute()
+const router = useRouter()
+
+onMounted(() => {
+  const flag = typeof route.query.strava === 'string' ? route.query.strava : ''
+  if (flag === 'connected') {
+    stravaMessage.value = 'Connected to Strava'
+    void refreshStrava()
+  } else if (flag === 'error') {
+    const reason = typeof route.query.reason === 'string' ? route.query.reason : 'unknown'
+    const messages: Record<string, string> = {
+      access_denied: 'Strava authorization was denied',
+      invalid_state: 'Strava login failed (invalid state)',
+      missing_activity_write: 'Upload permission was not granted — reconnect and allow activity upload',
+      token_exchange: 'Could not finish Strava login',
+    }
+    error.value = messages[reason] || `Strava login failed (${reason})`
+  }
+  if (flag) {
+    void router.replace({ query: {} })
+  }
+})
 
 const mergedStats = computed(() => {
   if (!merged.value) return null
@@ -138,6 +175,68 @@ function summary(stream: ActivityStream | null) {
 
 const phoneSummary = computed(() => summary(phone.value))
 const watchSummary = computed(() => summary(watch.value))
+
+function connectStrava() {
+  window.location.href = '/api/strava/auth'
+}
+
+async function disconnectStrava() {
+  await $fetch('/api/strava/logout', { method: 'POST' })
+  stravaMessage.value = ''
+  stravaActivityUrl.value = ''
+  await refreshStrava()
+}
+
+async function uploadToStrava() {
+  if (!merged.value) return
+  error.value = ''
+  stravaActivityUrl.value = ''
+  stravaUploading.value = true
+  busy.value = true
+  busyLabel.value = 'Uploading to Strava…'
+  try {
+    await yieldToUi()
+    // Prefer FIT — keeps HR / cadence / power that GPX may drop
+    const bytes = exportFit(merged.value)
+    const filename = `${merged.value.name.replace(/\s+/g, '_')}_merged.fit`
+    const form = new FormData()
+    form.append(
+      'file',
+      new Blob([bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)], {
+        type: 'application/octet-stream',
+      }),
+      filename,
+    )
+    form.append('data_type', 'fit')
+    form.append('name', merged.value.name)
+
+    const result = await $fetch<{
+      activityId: number | null
+      activityUrl: string | null
+    }>('/api/strava/upload', {
+      method: 'POST',
+      body: form,
+    })
+
+    if (result.activityUrl) {
+      stravaActivityUrl.value = result.activityUrl
+      stravaMessage.value = 'Uploaded to Strava'
+    } else {
+      stravaMessage.value = 'Upload accepted by Strava'
+    }
+  } catch (e: unknown) {
+    const msg =
+      (e as { data?: { statusMessage?: string }; statusMessage?: string; message?: string })
+        ?.data?.statusMessage ||
+      (e as { statusMessage?: string }).statusMessage ||
+      (e instanceof Error ? e.message : 'Strava upload failed')
+    error.value = msg
+  } finally {
+    stravaUploading.value = false
+    busy.value = false
+    busyLabel.value = ''
+  }
+}
 </script>
 
 <template>
@@ -149,6 +248,21 @@ const watchSummary = computed(() => summary(watch.value))
         Merge a phone recording with a watch recording, score overlapping metrics,
         and download a Strava-safe GPX or FIT without mixed-GPS teleports.
       </p>
+      <div v-if="strava?.configured" class="hero-actions">
+        <button
+          v-if="!strava.connected"
+          type="button"
+          class="strava"
+          @click="connectStrava"
+        >
+          Connect Strava
+        </button>
+        <p v-else class="strava-meta">
+          Strava ready · {{ strava.athlete || 'connected' }}
+          ·
+          <button type="button" class="linkish" @click="disconnectStrava">Disconnect</button>
+        </p>
+      </div>
     </section>
 
     <section class="uploads">
@@ -167,6 +281,7 @@ const watchSummary = computed(() => summary(watch.value))
     </section>
 
     <p v-if="error" class="error">{{ error }}</p>
+    <p v-if="stravaMessage && !error" class="ok">{{ stravaMessage }}</p>
     <p v-if="busy" class="busy">{{ busyLabel || 'Working…' }}</p>
 
     <section v-if="phoneSummary || watchSummary" class="summaries">
@@ -213,7 +328,37 @@ const watchSummary = computed(() => summary(watch.value))
           <button type="button" class="ghost" @click="downloadFit(merged)">
             Download FIT
           </button>
+          <template v-if="strava?.configured">
+            <button
+              v-if="strava.connected"
+              type="button"
+              class="strava"
+              :disabled="busy || stravaUploading"
+              @click="uploadToStrava"
+            >
+              {{ stravaUploading ? 'Uploading…' : 'Upload to Strava' }}
+            </button>
+            <button
+              v-else
+              type="button"
+              class="strava"
+              :disabled="busy"
+              @click="connectStrava"
+            >
+              Connect Strava
+            </button>
+          </template>
         </div>
+        <p v-if="strava?.configured && strava.connected" class="strava-meta">
+          Connected as {{ strava.athlete || 'Strava athlete' }}
+          ·
+          <button type="button" class="linkish" @click="disconnectStrava">Disconnect</button>
+        </p>
+        <p v-if="stravaActivityUrl" class="strava-meta">
+          <a :href="stravaActivityUrl" target="_blank" rel="noopener noreferrer">
+            Open activity on Strava
+          </a>
+        </p>
       </div>
       <TrackPreview :points="merged.points" />
     </section>
@@ -261,9 +406,11 @@ h1 {
   line-height: 1.55;
 }
 
+.hero-actions,
 .downloads {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.65rem;
 }
 
@@ -347,8 +494,47 @@ button.ghost {
   color: var(--ink);
 }
 
+button.strava {
+  background: #fc4c02;
+  color: #fff;
+  border-color: #fc4c02;
+  font-weight: 600;
+}
+
+button.strava:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+button.linkish {
+  display: inline;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.strava-meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.strava-meta a {
+  color: var(--accent);
+}
+
 .error {
   color: var(--warn);
+  margin: 0;
+}
+
+.ok {
+  color: var(--ok);
   margin: 0;
 }
 

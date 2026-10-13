@@ -24,6 +24,11 @@ services:
       PORT: 3000
       NITRO_HOST: 0.0.0.0
       NITRO_PORT: 3000
+      # Strava upload (https://www.strava.com/settings/api)
+      # Authorization Callback Domain = this host (no path)
+      # NUXT_PUBLIC_STRAVA_CLIENT_ID: "123456"
+      # NUXT_STRAVA_CLIENT_SECRET: "…"
+      # NUXT_STRAVA_REDIRECT_URI: https://nas.example.com/api/strava/callback
       # Behind a reverse proxy on a subpath:
       # NUXT_APP_BASE_URL: /strava-merge/
     healthcheck:

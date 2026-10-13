@@ -3,6 +3,14 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
   css: ['~/assets/css/main.css'],
+  runtimeConfig: {
+    stravaClientSecret: '',
+    /** Full callback URL override, e.g. https://nas.example.com/api/strava/callback */
+    stravaRedirectUri: '',
+    public: {
+      stravaClientId: '',
+    },
+  },
   app: {
     head: {
       htmlAttrs: { lang: 'en' },
