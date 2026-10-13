@@ -19,12 +19,12 @@ Open `http://localhost:3000`.
 
 ## Usage
 
-1. Upload phone + watch `.gpx` or `.fit` (or click **Try sample run**).
+1. Upload phone + watch `.gpx` or `.fit`.
 2. Review quality scores for shared metrics and pick a source.
 3. Exclusive metrics (e.g. phone cadence, watch HR) are included automatically.
 4. Download merged GPX or FIT and upload to Strava.
 
-Sample files in `samples/` / `public/samples/`:
+Local test files live in `samples/` (not served by the app):
 
 - `Miglia_Spezzate` — phone (GPS + cadence)
 - `Corsa_serale` — watch (GPS + heart rate)

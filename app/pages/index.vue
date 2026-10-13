@@ -123,40 +123,6 @@ function onChoicesUpdate(next: MergeChoices) {
   void rebuildMerged()
 }
 
-async function loadSamples() {
-  error.value = ''
-  busy.value = true
-  busyLabel.value = 'Loading samples…'
-  try {
-    await yieldToUi()
-    const [phoneRes, watchRes] = await Promise.all([
-      fetch('/samples/Miglia_Spezzate.fit'),
-      fetch('/samples/Corsa_serale.fit'),
-    ])
-    if (!phoneRes.ok || !watchRes.ok) throw new Error('Could not load sample files')
-    const phoneFile = new File([await phoneRes.blob()], 'Miglia_Spezzate.fit')
-    const watchFile = new File([await watchRes.blob()], 'Corsa_serale.fit')
-    const [phoneStream, watchStream] = await Promise.all([
-      parseActivityFile(phoneFile, 'phone'),
-      parseActivityFile(watchFile, 'watch'),
-    ])
-    phone.value = phoneStream
-    watch.value = watchStream
-    phoneName.value = phoneFile.name
-    watchName.value = watchFile.name
-    refreshChoices()
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Failed to load samples'
-  } finally {
-    busy.value = false
-    busyLabel.value = ''
-  }
-
-  if (phone.value && watch.value && choices.value) {
-    await rebuildMerged()
-  }
-}
-
 function summary(stream: ActivityStream | null) {
   if (!stream) return null
   const present = (['gps', 'ele', 'hr', 'cad', 'power', 'speed', 'temp'] as const)
@@ -183,11 +149,6 @@ const watchSummary = computed(() => summary(watch.value))
         Merge a phone recording with a watch recording, score overlapping metrics,
         and download a Strava-safe GPX or FIT without mixed-GPS teleports.
       </p>
-      <div class="hero-actions">
-        <button type="button" class="ghost" :disabled="busy" @click="loadSamples">
-          Try sample run
-        </button>
-      </div>
     </section>
 
     <section class="uploads">
@@ -300,7 +261,6 @@ h1 {
   line-height: 1.55;
 }
 
-.hero-actions,
 .downloads {
   display: flex;
   flex-wrap: wrap;

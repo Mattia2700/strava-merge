@@ -6,6 +6,10 @@ const props = defineProps<{
   points: TrackPoint[]
 }>()
 
+const W = 640
+const H = 360
+const PAD = 0.08
+
 const path = computed(() => {
   const pts = props.points.filter(hasGps)
   if (pts.length < 2) return ''
@@ -16,15 +20,25 @@ const path = computed(() => {
   const maxLat = Math.max(...lats)
   const minLon = Math.min(...lons)
   const maxLon = Math.max(...lons)
-  const pad = 0.08
-  const w = 640
-  const h = 360
-  const spanLon = Math.max(maxLon - minLon, 1e-6)
-  const spanLat = Math.max(maxLat - minLat, 1e-6)
+
+  const midLat = ((minLat + maxLat) / 2) * (Math.PI / 180)
+  const cosLat = Math.max(Math.cos(midLat), 1e-6)
+
+  // Equirectangular meters-ish units so lon isn't stretched vs lat
+  const geoW = Math.max((maxLon - minLon) * cosLat, 1e-9)
+  const geoH = Math.max(maxLat - minLat, 1e-9)
+
+  const availW = W * (1 - PAD * 2)
+  const availH = H * (1 - PAD * 2)
+  const scale = Math.min(availW / geoW, availH / geoH)
+  const drawW = geoW * scale
+  const drawH = geoH * scale
+  const offsetX = (W - drawW) / 2
+  const offsetY = (H - drawH) / 2
 
   const proj = (lat: number, lon: number) => {
-    const x = ((lon - minLon) / spanLon) * (1 - pad * 2) * w + pad * w
-    const y = (1 - (lat - minLat) / spanLat) * (1 - pad * 2) * h + pad * h
+    const x = offsetX + (lon - minLon) * cosLat * scale
+    const y = offsetY + (maxLat - lat) * scale
     return `${x.toFixed(1)},${y.toFixed(1)}`
   }
 
