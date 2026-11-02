@@ -12,11 +12,23 @@ export interface TrackPoint {
   temp?: number
 }
 
+/** Workout / interval splits from a FIT lap message. */
+export interface ActivityLap {
+  startTime: number
+  endTime: number
+  trigger?: string
+  /** Original distance from source file when present (meters). */
+  totalDistance?: number
+  totalElapsedTime?: number
+  totalTimerTime?: number
+}
+
 export interface ActivityStream {
   name: string
   sport: string
   sourceLabel: string
   points: TrackPoint[]
+  laps?: ActivityLap[]
 }
 
 export interface ChannelScore {

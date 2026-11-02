@@ -67,13 +67,17 @@ function formatScore(n: number): string {
       </article>
     </div>
 
-    <div v-if="exclusive.length" class="exclusive">
+    <div class="exclusive">
       <h3>Auto-included</h3>
       <ul>
         <li v-for="d in exclusive" :key="d.channel">
           <strong>{{ METRIC_LABELS[d.channel] }}</strong>
           from {{ d.phonePresent ? 'phone' : 'watch' }}
           (score {{ formatScore(d.phonePresent ? d.phoneScore : d.watchScore) }})
+        </li>
+        <li>
+          <strong>Laps / intervals</strong>
+          from the file with the richer split structure (usually phone workout)
         </li>
       </ul>
     </div>

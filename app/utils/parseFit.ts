@@ -1,4 +1,4 @@
-import type { ActivityStream, TrackPoint } from './activity'
+import type { ActivityLap, ActivityStream, TrackPoint } from './activity'
 
 /** FIT timestamps are seconds since 1989-12-31, not Unix. */
 const FIT_EPOCH_MS = 631_065_600_000
@@ -61,6 +61,7 @@ export async function parseFitBuffer(
   const sessions = (messages?.sessionMesgs ?? []) as Array<Record<string, unknown>>
   const sports = (messages?.sportMesgs ?? []) as Array<Record<string, unknown>>
   const fileIds = (messages?.fileIdMesgs ?? []) as Array<Record<string, unknown>>
+  const lapMesgs = (messages?.lapMesgs ?? []) as Array<Record<string, unknown>>
 
   const points: TrackPoint[] = []
   for (const rec of records) {
@@ -108,7 +109,35 @@ export async function parseFitBuffer(
   const name =
     String(session.name ?? fileIds[0]?.productName ?? sourceLabel) || 'FIT activity'
 
-  return { name, sport, sourceLabel, points }
+  const laps: ActivityLap[] = []
+  for (const lap of lapMesgs) {
+    const startTime = toMs(lap.startTime ?? lap.start_time)
+    const endTime =
+      toMs(lap.timestamp) ??
+      (startTime != null && typeof lap.totalElapsedTime === 'number'
+        ? startTime + lap.totalElapsedTime * 1000
+        : undefined)
+    if (startTime == null || endTime == null || endTime < startTime) continue
+
+    const out: ActivityLap = { startTime, endTime }
+    if (typeof lap.lapTrigger === 'string') out.trigger = lap.lapTrigger
+    else if (typeof lap.lap_trigger === 'string') out.trigger = lap.lap_trigger
+    if (typeof lap.totalDistance === 'number') out.totalDistance = lap.totalDistance
+    if (typeof lap.totalElapsedTime === 'number') {
+      out.totalElapsedTime = lap.totalElapsedTime
+    }
+    if (typeof lap.totalTimerTime === 'number') out.totalTimerTime = lap.totalTimerTime
+    laps.push(out)
+  }
+  laps.sort((a, b) => a.startTime - b.startTime)
+
+  return {
+    name,
+    sport,
+    sourceLabel,
+    points,
+    laps: laps.length ? laps : undefined,
+  }
 }
 
 export async function parseFitFile(

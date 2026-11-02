@@ -95,6 +95,7 @@ const mergedStats = computed(() => {
     points: pts.length,
     duration: formatDuration(durationMs(merged.value)),
     metrics,
+    laps: merged.value.laps?.length ?? 0,
   }
 })
 
@@ -180,6 +181,7 @@ function summary(stream: ActivityStream | null) {
     points: stream.points.length,
     duration: formatDuration(durationMs(stream)),
     metrics: present,
+    laps: stream.laps?.length ?? 0,
   }
 }
 
@@ -306,6 +308,7 @@ async function uploadToStrava() {
         <ul>
           <li>{{ phoneSummary.points }} points</li>
           <li>{{ phoneSummary.duration }}</li>
+          <li v-if="phoneSummary.laps">{{ phoneSummary.laps }} laps</li>
           <li>{{ phoneSummary.metrics.join(' · ') }}</li>
         </ul>
       </article>
@@ -315,6 +318,7 @@ async function uploadToStrava() {
         <ul>
           <li>{{ watchSummary.points }} points</li>
           <li>{{ watchSummary.duration }}</li>
+          <li v-if="watchSummary.laps">{{ watchSummary.laps }} laps</li>
           <li>{{ watchSummary.metrics.join(' · ') }}</li>
         </ul>
       </article>
@@ -332,6 +336,9 @@ async function uploadToStrava() {
         <h2>Merged preview</h2>
         <p>
           {{ mergedStats.points }} points · {{ mergedStats.duration }}
+          <template v-if="mergedStats.laps">
+            · {{ mergedStats.laps }} laps
+          </template>
           <template v-if="mergedStats.metrics.length">
             · {{ mergedStats.metrics.join(' · ') }}
           </template>

@@ -1,4 +1,5 @@
 import {
+  type ActivityLap,
   type ActivityStream,
   type MergeChoices,
   type MetricKey,
@@ -229,6 +230,28 @@ function indexBundle(stream: ActivityStream) {
   }
 }
 
+/** Prefer the richer interval structure (manual/distance/time laps) — usually the phone workout. */
+export function selectLaps(
+  phone: ActivityStream,
+  watch: ActivityStream,
+): ActivityLap[] | undefined {
+  const phoneLaps = phone.laps ?? []
+  const watchLaps = watch.laps ?? []
+  if (!phoneLaps.length && !watchLaps.length) return undefined
+
+  const score = (laps: ActivityLap[]) => {
+    if (!laps.length) return 0
+    const structured = laps.filter((l) => {
+      const t = (l.trigger || '').toLowerCase()
+      return t === 'manual' || t === 'distance' || t === 'time' || t === 'position'
+    }).length
+    return structured * 10 + laps.length
+  }
+
+  const pick = score(phoneLaps) >= score(watchLaps) ? phoneLaps : watchLaps
+  return pick.length ? pick.map((l) => ({ ...l })) : undefined
+}
+
 export function mergeActivities(
   phone: ActivityStream,
   watch: ActivityStream,
@@ -288,10 +311,13 @@ export function mergeActivities(
     points = stripTeleportJumps(points)
   }
 
+  const laps = selectLaps(phone, watch)
+
   return {
     name: phone.name || watch.name || 'Merged activity',
     sport: phone.sport || watch.sport || 'running',
     sourceLabel: 'merged',
     points,
+    laps,
   }
 }

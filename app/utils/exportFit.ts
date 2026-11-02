@@ -1,9 +1,82 @@
 import { Encoder, Profile } from '@garmin/fitsdk'
-import type { ActivityStream } from './activity'
+import type { ActivityLap, ActivityStream, TrackPoint } from './activity'
 import { haversineMeters, hasGps } from './activity'
 
 function degToSemicircles(deg: number): number {
   return Math.round(deg * (2 ** 31 / 180))
+}
+
+function pathDistance(points: TrackPoint[]): number {
+  let distance = 0
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1]!
+    const b = points[i]!
+    if (!hasGps(a) || !hasGps(b)) continue
+    distance += haversineMeters(a.lat!, a.lon!, b.lat!, b.lon!)
+  }
+  return distance
+}
+
+function pointsInWindow(
+  points: TrackPoint[],
+  startTime: number,
+  endTime: number,
+): TrackPoint[] {
+  return points.filter((p) => p.t >= startTime && p.t <= endTime)
+}
+
+function normalizeLaps(
+  stream: ActivityStream,
+  points: TrackPoint[],
+): ActivityLap[] {
+  const activityStart = points[0]!.t
+  const activityEnd = points[points.length - 1]!.t
+  const source = stream.laps?.length
+    ? stream.laps
+    : [
+        {
+          startTime: activityStart,
+          endTime: activityEnd,
+          trigger: 'sessionEnd',
+        },
+      ]
+
+  const laps: ActivityLap[] = []
+  for (const lap of source) {
+    const startTime = Math.max(activityStart, Math.min(lap.startTime, activityEnd))
+    const endTime = Math.max(startTime, Math.min(lap.endTime, activityEnd))
+    const window = pointsInWindow(points, startTime, endTime)
+    if (window.length < 1) continue
+
+    const elapsedSec = Math.max(1, (endTime - startTime) / 1000)
+    const timerSec =
+      typeof lap.totalTimerTime === 'number' && lap.totalTimerTime > 0
+        ? lap.totalTimerTime
+        : elapsedSec
+
+    laps.push({
+      startTime,
+      endTime,
+      trigger: lap.trigger,
+      totalDistance: pathDistance(window),
+      totalElapsedTime: elapsedSec,
+      totalTimerTime: timerSec,
+    })
+  }
+
+  if (!laps.length) {
+    const elapsed = Math.max(1, (activityEnd - activityStart) / 1000)
+    laps.push({
+      startTime: activityStart,
+      endTime: activityEnd,
+      trigger: 'sessionEnd',
+      totalDistance: pathDistance(points),
+      totalElapsedTime: elapsed,
+      totalTimerTime: elapsed,
+    })
+  }
+
+  return laps
 }
 
 export function exportFit(stream: ActivityStream): Uint8Array {
@@ -16,13 +89,9 @@ export function exportFit(stream: ActivityStream): Uint8Array {
   const end = points[points.length - 1]!
   const startDate = new Date(start.t)
   const endDate = new Date(end.t)
-
-  let distance = 0
-  for (let i = 1; i < points.length; i++) {
-    const a = points[i - 1]!
-    const b = points[i]!
-    distance += haversineMeters(a.lat!, a.lon!, b.lat!, b.lon!)
-  }
+  const distance = pathDistance(points)
+  const elapsed = Math.max(1, (end.t - start.t) / 1000)
+  const laps = normalizeLaps(stream, points)
 
   const encoder = new Encoder()
 
@@ -81,16 +150,32 @@ export function exportFit(stream: ActivityStream): Uint8Array {
     eventGroup: 0,
   })
 
-  const elapsed = Math.max(1, (end.t - start.t) / 1000)
+  for (let i = 0; i < laps.length; i++) {
+    const lap = laps[i]!
+    const isLast = i === laps.length - 1
+    const trigger =
+      lap.trigger === 'manual' ||
+      lap.trigger === 'distance' ||
+      lap.trigger === 'time' ||
+      lap.trigger === 'position' ||
+      lap.trigger === 'sessionEnd'
+        ? lap.trigger
+        : isLast
+          ? 'sessionEnd'
+          : 'manual'
 
-  encoder.onMesg(Profile.MesgNum.LAP, {
-    timestamp: endDate,
-    startTime: startDate,
-    totalElapsedTime: elapsed,
-    totalTimerTime: elapsed,
-    totalDistance: distance,
-    sport,
-  })
+    encoder.onMesg(Profile.MesgNum.LAP, {
+      timestamp: new Date(lap.endTime),
+      startTime: new Date(lap.startTime),
+      totalElapsedTime: lap.totalElapsedTime ?? Math.max(1, (lap.endTime - lap.startTime) / 1000),
+      totalTimerTime: lap.totalTimerTime ?? lap.totalElapsedTime ?? 1,
+      totalDistance: lap.totalDistance ?? 0,
+      sport,
+      lapTrigger: trigger,
+      event: 'lap',
+      eventType: 'stop',
+    })
+  }
 
   encoder.onMesg(Profile.MesgNum.SESSION, {
     timestamp: endDate,
@@ -101,7 +186,9 @@ export function exportFit(stream: ActivityStream): Uint8Array {
     sport,
     subSport: 'generic',
     firstLapIndex: 0,
-    numLaps: 1,
+    numLaps: laps.length,
+    event: 'session',
+    eventType: 'stop',
   })
 
   encoder.onMesg(Profile.MesgNum.ACTIVITY, {
